@@ -217,6 +217,14 @@ def parse_options():
         default=False,
         help="print json data of the locust classes' task execution ratio"
     )
+    # Skip resetting
+    parser.add_option(
+        '--skip-reset',
+        action='store_true',
+        dest='skip_reset',
+        default=False,
+        help="skip resetting"
+    )
     
     # Version number (optparse gives you --version but we have to do it
     # ourselves to get -V too. sigh)

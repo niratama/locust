@@ -37,12 +37,15 @@ class LocustRunner(object):
         self.hatching_greenlet = None
         self.exceptions = {}
         self.stats = global_stats
+        self.slave_index = None
+        self.skip_reset = options.skip_reset
         
         # register listener that resets stats when hatching is complete
         def on_hatch_complete(user_count):
             self.state = STATE_RUNNING
-            logger.info("Resetting stats\n")
-            self.stats.reset_all()
+            if not self.skip_reset:
+                logger.info("Resetting stats\n")
+                self.stats.reset_all()
         events.hatch_complete += on_hatch_complete
 
     @property
@@ -252,6 +255,15 @@ class MasterLocustRunner(DistributedLocustRunner):
 
             self.clients[client_id].user_count = data["user_count"]
         events.slave_report += on_slave_report
+
+        # register listener that receive response log from the slave nodes
+        def on_slave_request(client_id, data):
+            if client_id not in self.clients:
+                logger.info("Discarded request from unrecognized slave %s", client_id)
+                return
+            data["slave_index"] = slave_index
+            events.request.fire(data=data)
+        events.slave_request += on_slave_request
         
         # register listener that sends quit message to slave nodes
         def on_quitting():
@@ -281,14 +293,18 @@ class MasterLocustRunner(DistributedLocustRunner):
             self.exceptions = {}
             events.master_start_hatching.fire()
         
+        slave_index = 0
         for client in self.clients.itervalues():
             data = {
                 "hatch_rate":slave_hatch_rate,
                 "num_clients":slave_num_clients,
                 "num_requests": self.num_requests,
                 "host":self.host,
+                "slave_index": slave_index,
+                "skip_reset":self.skip_reset,
                 "stop_timeout":None
             }
+            slave_index += 1
 
             if remaining > 0:
                 data["num_clients"] += 1
@@ -326,6 +342,8 @@ class MasterLocustRunner(DistributedLocustRunner):
                 logger.info("Removing %s client from running clients" % (msg.node_id))
             elif msg.type == "stats":
                 events.slave_report.fire(client_id=msg.node_id, data=msg.data)
+            elif msg.type == "request":
+                events.slave_request.fire(client_id=msg.node_id, data=msg.data)
             elif msg.type == "hatching":
                 self.clients[msg.node_id].state = STATE_HATCHING
             elif msg.type == "hatch_complete":
@@ -367,6 +385,12 @@ class SlaveLocustRunner(DistributedLocustRunner):
             data["user_count"] = self.user_count
         events.report_to_master += on_report_to_master
         
+        # register listener that sends request log to the master node
+        def on_request(data):
+            data["slave_index"] = self.slave_index
+            self.client.send(Message("request", data, self.client_id))
+        events.request += on_request
+       
         # register listener that sends quit message to master
         def on_quitting():
             self.client.send(Message("quit", None, self.client_id))
@@ -388,6 +412,8 @@ class SlaveLocustRunner(DistributedLocustRunner):
                 #self.num_clients = job["num_clients"]
                 self.num_requests = job["num_requests"]
                 self.host = job["host"]
+                self.slave_index = job["slave_index"]
+                self.skip_reset = job["skip_reset"]
                 self.hatching_greenlet = gevent.spawn(lambda: self.start_hatching(locust_count=job["num_clients"], hatch_rate=job["hatch_rate"]))
             elif msg.type == "stop":
                 self.stop()

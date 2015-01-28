@@ -144,6 +144,17 @@ class HttpSession(requests.Session):
                     response_time=request_meta["response_time"],
                     response_length=request_meta["content_size"],
                 )
+            events.request.fire(data={
+                "request_type":request_meta["method"],
+                "name":request_meta["name"],
+                "response_time":request_meta["response_time"],
+                "response_length":request_meta["content_size"],
+                "url":url,
+                "start_time":int(request_meta["start_time"] * 1000),
+                "response_code":response.status_code,
+                "response_message":response.reason,
+                "success":response.ok,
+            })
             return response
     
     def _send_request_safe_mode(self, method, url, **kwargs):

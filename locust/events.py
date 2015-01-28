@@ -50,6 +50,15 @@ Event is fired with the following arguments:
 * *exception*: Exception instance that was thrown
 """
 
+request = EventHook()
+"""
+*request* is fireed when a request sent.
+
+Event is fired with the following arguments:
+
+* *data*: Data dict with request log data
+"""
+
 locust_error = EventHook()
 """
 *locust_error* is fired when an exception occurs inside the execution of a Locust class.
@@ -79,6 +88,19 @@ slave_report = EventHook()
 """
 *slave_report* is used when Locust is running in --master mode and is fired when the master
 server receives a report from a Locust slave server.
+
+This event can be used to aggregate data from the locust slave servers.
+
+Event is fired with following arguments:
+
+* *client_id*: Client id of the reporting locust slave
+* *data*: Data dict with the data from the slave node
+"""
+
+slave_request = EventHook()
+"""
+*slave_request* is used when Locust is running in --master mode and is fired when the master
+server receives a request log from a Locust slave server.
 
 This event can be used to aggregate data from the locust slave servers.
 
