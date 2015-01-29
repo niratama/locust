@@ -261,7 +261,7 @@ class MasterLocustRunner(DistributedLocustRunner):
             if client_id not in self.clients:
                 logger.info("Discarded request from unrecognized slave %s", client_id)
                 return
-            data["slave_index"] = slave_index
+            data["slave_index"] = self.slave_index
             events.request.fire(data=data)
         events.slave_request += on_slave_request
         
